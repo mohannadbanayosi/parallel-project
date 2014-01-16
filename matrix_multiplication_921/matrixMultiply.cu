@@ -123,10 +123,9 @@ inline void MatrixMulOnDevice4(float* M, float* N, float* P, int Width, int unro
 	Pd[threadIdx.y*Width+threadIdx.x]=Pvalue; 
 }*/
 
+
 inline __global__ void MatrixMulKernelTiled8x8(float* Md, float* Nd, float* Pd, int Width) { 
 	const int TILE_WIDTH = 8;
-	__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
-	__shared__ float Nds[TILE_WIDTH][TILE_WIDTH]; 
 	int bx = blockIdx.x;  
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
@@ -136,20 +135,36 @@ inline __global__ void MatrixMulKernelTiled8x8(float* Md, float* Nd, float* Pd, 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
 	// Loop over the Md and Nd tiles required to compute the Pd element 
-	for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-		// Collaborative loading of Md and Nd tiles into shared memory
-		Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
-		Nds[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col];
-		__syncthreads();
-		for (int k = 0; k < TILE_WIDTH; ++k) 
-			Pvalue += Mds[ty][k] * Nds[k][tx];
-		__syncthreads();
-	} 
+	 for (int k = 0; k < Width; ++k) {    
+		 float Melement=Md[threadIdx.y*Width+k];    
+		 float Nelement=Nd[k*Width+threadIdx.x];    
+		 Pvalue += Melement * Nelement;  
+	 }
+
 	Pd[Row*Width + Col] = Pvalue; 
 }
 
 inline __global__ void MatrixMulKernelTiled16x16(float* Md, float* Nd, float* Pd, int Width) { 
 	const int TILE_WIDTH = 16;
+	int bx = blockIdx.x;  
+	int by = blockIdx.y; 
+	int tx = threadIdx.x; 
+	int ty = threadIdx.y; 
+	// Identify the row and column of the Pd element to work on
+	int Row = by * TILE_WIDTH + ty; 
+	int Col = bx * TILE_WIDTH + tx; 
+	float Pvalue = 0; 
+	// Loop over the Md and Nd tiles required to compute the Pd element 
+	for (int k = 0; k < Width; ++k) {    
+		 float Melement=Md[threadIdx.y*Width+k];    
+		 float Nelement=Nd[k*Width+threadIdx.x];    
+		 Pvalue += Melement * Nelement;  
+	 }
+	Pd[Row*Width + Col] = Pvalue; 
+}
+
+inline __global__ void MatrixMulKernelTiled8x8Prefetching(float* Md, float* Nd, float* Pd, int Width) { 
+	const int TILE_WIDTH = 8;
 	__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
 	__shared__ float Nds[TILE_WIDTH][TILE_WIDTH]; 
 	int bx = blockIdx.x;  
