@@ -9,6 +9,30 @@
 int main()
 {
 
+	// START - Randomized matrix creation
+	srand(time(NULL));
+    int multiple = rand() % 20; // a random multiple from 0 to 20
+    printf("multiple = %d\n", multiple );
+    
+    int width = 16 * multiple;
+    printf("width = %d\n", width );
+    
+    int size = width * width;
+    printf("size = %d\n", size );
+    
+    int M[size];
+    for (int i = 0; i<size; i++) {
+        M[i] = random() % 1000; // a random value in the matrix from 0 to 1000
+    }
+    int N[size];
+    for (int i = 0; i<size; i++) {
+        N[i] = random() % 1000; // a random value in the matrix from 0 to 1000
+    }
+    int P[size];
+    // END - Randomized matrix creation
+
+
+    
     const int arraySize = 512;
     float a[arraySize*arraySize];
 	for(int i = 0; i < 262144; i++) {
