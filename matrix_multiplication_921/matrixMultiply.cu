@@ -12,7 +12,32 @@
 inline __global__ void MatrixMulKernelTiled8x8(float* Md, float* Nd, float* Pd, int Width);
 inline __global__ void MatrixMulKernelTiled16x16(float* Md, float* Nd, float* Pd, int Width);
 inline __global__ void MatrixMulKernelTiledUnrolling(float* Md, float* Nd, float* Pd, int Width, int unrolling);
+inline __global__ void MatrixMulKernelTiled8x8prefetch(float* Md, float* Nd, float* Pd, int Width);
+inline __global__ void MatrixMulKernelTiled8x8gran1x2(float* Md, float* Nd, float* Pd, int Width);
+inline __global__ void MatrixMulKernelTiled8x8gran1x4(float* Md, float* Nd, float* Pd, int Width);
 
+inline void MatrixMulOnDevice1(float* M, float* N, float* P, int Width, float timing) {   
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	cudaEventRecord(start, 0);    
+	for (int i = 0; i < Width; ++i) {
+        for (int j = 0; j < Width; ++j) {
+            double sum = 0;
+            for (int k = 0; k < Width; ++k) {
+                double a = M[i * Width + k];
+                double b = N[k * Width + j];
+                sum += a * b;
+            }
+            P[i*Width+j]=sum;
+        }
+    }
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&timing, start, stop); // that's our time!
+	cudaEventDestroy(start);
+	cudaEventDestroy(stop);
+}
 
 
 inline void MatrixMulOnDevice2(float* M, float* N, float* P, int Width, float timing) {   
@@ -109,6 +134,60 @@ inline void MatrixMulOnDevice4(float* M, float* N, float* P, int Width, int unro
 	// Free device matrices    
 	cudaFree(Md); cudaFree(Nd); cudaFree (Pd); 
 }
+
+inline void MatrixMulOnDevice5(float* M, float* N, float* P, int Width) {   
+	int size = Width * Width * sizeof(float);    
+	float *Md, *Nd, *Pd;   
+	//Allocate and Load M, N to device memory    
+	cudaMalloc(&Md, size);   
+	cudaMemcpy(Md, M, size, cudaMemcpyHostToDevice);   
+	cudaMalloc(&Nd, size);   
+	cudaMemcpy(Nd, N, size, cudaMemcpyHostToDevice);   
+	//Allocate P on the device   
+	cudaMalloc(&Pd, size);
+	// Kernel invocation code – to be shown later    
+	// Setup the execution configuration    
+	dim3 dimGrid3(Width/8, Width/8);   
+	dim3 dimBlock3(8, 8);
+
+    // Launch the device computation threads!    
+	MatrixMulKernelTiled8x8prefetch<<< dimGrid3, dimBlock3 >>>(Md, Nd, Pd, Width);
+
+	//Read P from the device    
+	cudaMemcpy(P, Pd, size, cudaMemcpyDeviceToHost);        
+	// Free device matrices    
+	cudaFree(Md); cudaFree(Nd); cudaFree (Pd); 
+}
+
+inline void MatrixMulOnDevice6(float* M, float* N, float* P, int Width, int gran) {   
+	int size = Width * Width * sizeof(float);    
+	float *Md, *Nd, *Pd;   
+	//Allocate and Load M, N to device memory    
+	cudaMalloc(&Md, size);   
+	cudaMemcpy(Md, M, size, cudaMemcpyHostToDevice);   
+	cudaMalloc(&Nd, size);   
+	cudaMemcpy(Nd, N, size, cudaMemcpyHostToDevice);   
+	//Allocate P on the device   
+	cudaMalloc(&Pd, size);
+	// Kernel invocation code – to be shown later    
+	// Setup the execution configuration    
+	dim3 dimGrid3(Width/8, Width/8);   
+	dim3 dimBlock3(8, 8);
+
+    // Launch the device computation threads! 
+	if(gran == 2) {
+		MatrixMulKernelTiled8x8gran1x2<<< dimGrid3, dimBlock3 >>>(Md, Nd, Pd, Width);
+	}
+	else if(gran == 4) {
+		MatrixMulKernelTiled8x8gran1x4<<< dimGrid3, dimBlock3 >>>(Md, Nd, Pd, Width);
+	}
+
+	//Read P from the device    
+	cudaMemcpy(P, Pd, size, cudaMemcpyDeviceToHost);        
+	// Free device matrices    
+	cudaFree(Md); cudaFree(Nd); cudaFree (Pd); 
+}
+
 
 // Matrix multiplication kernel – per thread code
 /*inline __global__ void MatrixMulKernel(float* Md, float* Nd, float* Pd, int Width) {        
@@ -238,13 +317,13 @@ inline __global__ void MatrixMulKernelTiled8x8prefetch(float* Md, float* Nd, flo
 
 	int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 	int N = Nd[(0*TILE_WIDTH + ty)*Width + Col];
-	for (int m = 1; m < Width/TILE_WIDTH; ++m) { 
+	for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
 		Mds[ty][tx] = M;
 		Nds[ty][tx] = N;
 		__syncthreads();
 
-		M = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
-		N = Nd[(m*TILE_WIDTH + ty)*Width + Col];
+		M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+		N = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col];
 		
 		for (int k = 0; k < TILE_WIDTH; ++k) 
 			Pvalue += Mds[ty][k] * Nds[k][tx];
@@ -276,7 +355,7 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x2(float* Md, float* Nd, floa
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
 			__syncthreads();
-			for (int k = 0; k < TILE_WIDTH; ++k){
+			for (int k = 0; k < TILE_WIDTH; ++k) {
 				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
 				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
 			}
@@ -318,7 +397,7 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4(float* Md, float* Nd, floa
 			Nds3[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col3];
 			Nds4[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col4];
 			__syncthreads();
-			for (int k = 0; k < TILE_WIDTH; ++k){
+			for (int k = 0; k < TILE_WIDTH; ++k) {
 				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
 				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
 				Pvalue3 += Mds[ty][k] * Nds3[k][tx];
