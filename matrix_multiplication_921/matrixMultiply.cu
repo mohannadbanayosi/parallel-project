@@ -1036,3 +1036,207 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4Unrolling(float* Md, floa
 		Pd[Row*Width + Col4] = Pvalue4; 
 	}
 }
+
+inline __global__ void MatrixMulKernelTiled8x8gran1x2prefetch(float* Md, float* Nd, float* Pd, int Width) { 
+	if ((blockIdx.x % 2) == 0) {	
+		const int TILE_WIDTH = 8;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			__syncthreads();
+
+			int M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			int N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			int N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+
+			for (int k = 0; k < TILE_WIDTH; ++k) {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetch(float* Md, float* Nd, float* Pd, int Width) { 
+	if ((blockIdx.x % 4) == 0) {
+		const int TILE_WIDTH = 8;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds3[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds4[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		int Col3 = Col2 + TILE_WIDTH; 
+		int Col4 = Col3 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		float Pvalue3 = 0; 
+		float Pvalue4 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
+		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			Nds3[ty][tx] = N3;
+			Nds4[ty][tx] = N4;
+			__syncthreads();
+
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+			N3 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col3];
+			N4 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col4];
+
+			for (int k = 0; k < TILE_WIDTH; ++k) {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+				Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+				Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+		Pd[Row*Width + Col3] = Pvalue3; 
+		Pd[Row*Width + Col4] = Pvalue4; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled16x16gran1x2prefetch(float* Md, float* Nd, float* Pd, int Width) { 
+	if ((blockIdx.x % 2) == 0) {	
+		const int TILE_WIDTH = 16;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			__syncthreads();
+
+			int M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			int N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			int N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+
+			for (int k = 0; k < TILE_WIDTH; ++k) {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetch(float* Md, float* Nd, float* Pd, int Width) { 
+	if ((blockIdx.x % 4) == 0) {
+		const int TILE_WIDTH = 16;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds3[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds4[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		int Col3 = Col2 + TILE_WIDTH; 
+		int Col4 = Col3 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		float Pvalue3 = 0; 
+		float Pvalue4 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
+		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			Nds3[ty][tx] = N3;
+			Nds4[ty][tx] = N4;
+			__syncthreads();
+
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+			N3 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col3];
+			N4 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col4];
+
+			for (int k = 0; k < TILE_WIDTH; ++k) {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+				Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+				Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+		Pd[Row*Width + Col3] = Pvalue3; 
+		Pd[Row*Width + Col4] = Pvalue4; 
+	}
+}
