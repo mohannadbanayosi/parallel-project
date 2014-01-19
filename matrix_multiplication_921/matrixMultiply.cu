@@ -1065,9 +1065,9 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x2prefetch(float* Md, float* 
 			Nds2[ty][tx] = N2;
 			__syncthreads();
 
-			int M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
-			int N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
-			int N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
 
 			for (int k = 0; k < TILE_WIDTH; ++k) {
 				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
@@ -1167,9 +1167,9 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x2prefetch(float* Md, float
 			Nds2[ty][tx] = N2;
 			__syncthreads();
 
-			int M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
-			int N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
-			int N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
 
 			for (int k = 0; k < TILE_WIDTH; ++k) {
 				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
@@ -1231,6 +1231,398 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetch(float* Md, float
 				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
 				Pvalue3 += Mds[ty][k] * Nds3[k][tx];
 				Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+		Pd[Row*Width + Col3] = Pvalue3; 
+		Pd[Row*Width + Col4] = Pvalue4; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled8x8gran1x2prefetchUnrolling(float* Md, float* Nd, float* Pd, int Width, int unrolling) { 
+	if ((blockIdx.x % 2) == 0) {	
+		const int TILE_WIDTH = 8;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			__syncthreads();
+
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+
+			if(unrolling == 2) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+				}
+			}
+			else if(unrolling == 4) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+					Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+					Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+					Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+					Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+				}
+			}
+			else {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+				Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+				Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+				Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+				Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+				Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+				Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+				Pvalue1 += Mds[ty][k+4] * Nds1[k+4][tx];
+				Pvalue2 += Mds[ty][k+4] * Nds2[k+4][tx];
+				Pvalue1 += Mds[ty][k+5] * Nds1[k+5][tx];
+				Pvalue2 += Mds[ty][k+5] * Nds2[k+5][tx];
+				Pvalue1 += Mds[ty][k+6] * Nds1[k+6][tx];
+				Pvalue2 += Mds[ty][k+6] * Nds2[k+6][tx];
+				Pvalue1 += Mds[ty][k+7] * Nds1[k+7][tx];
+				Pvalue2 += Mds[ty][k+7] * Nds2[k+7][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetchUnrolling(float* Md, float* Nd, float* Pd, int Width, int unrolling) { 
+	if ((blockIdx.x % 4) == 0) {
+		const int TILE_WIDTH = 8;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds3[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds4[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		int Col3 = Col2 + TILE_WIDTH; 
+		int Col4 = Col3 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		float Pvalue3 = 0; 
+		float Pvalue4 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
+		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			Nds3[ty][tx] = N3;
+			Nds4[ty][tx] = N4;
+			__syncthreads();
+
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+			N3 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col3];
+			N4 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col4];
+
+			if(unrolling == 2) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+					Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+					Pvalue3 += Mds[ty][k+1] * Nds3[k+1][tx];
+					Pvalue4 += Mds[ty][k+1] * Nds4[k+1][tx];
+				}
+			}
+			else if(unrolling == 4) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+					Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+					Pvalue3 += Mds[ty][k+1] * Nds3[k+1][tx];
+					Pvalue4 += Mds[ty][k+1] * Nds4[k+1][tx];
+					Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+					Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+					Pvalue3 += Mds[ty][k+2] * Nds3[k+2][tx];
+					Pvalue4 += Mds[ty][k+2] * Nds4[k+2][tx];
+					Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+					Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+					Pvalue3 += Mds[ty][k+3] * Nds3[k+3][tx];
+					Pvalue4 += Mds[ty][k+3] * Nds4[k+3][tx];
+				}
+			}
+			else {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+				Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+				Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+				Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+				Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+				Pvalue3 += Mds[ty][k+1] * Nds3[k+1][tx];
+				Pvalue4 += Mds[ty][k+1] * Nds4[k+1][tx];
+				Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+				Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+				Pvalue3 += Mds[ty][k+2] * Nds3[k+2][tx];
+				Pvalue4 += Mds[ty][k+2] * Nds4[k+2][tx];
+				Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+				Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+				Pvalue3 += Mds[ty][k+3] * Nds3[k+3][tx];
+				Pvalue4 += Mds[ty][k+3] * Nds4[k+3][tx];
+				Pvalue1 += Mds[ty][k+4] * Nds1[k+4][tx];
+				Pvalue2 += Mds[ty][k+4] * Nds2[k+4][tx];
+				Pvalue3 += Mds[ty][k+4] * Nds3[k+4][tx];
+				Pvalue4 += Mds[ty][k+4] * Nds4[k+4][tx];
+				Pvalue1 += Mds[ty][k+5] * Nds1[k+5][tx];
+				Pvalue2 += Mds[ty][k+5] * Nds2[k+5][tx];
+				Pvalue3 += Mds[ty][k+5] * Nds3[k+5][tx];
+				Pvalue4 += Mds[ty][k+5] * Nds4[k+5][tx];
+				Pvalue1 += Mds[ty][k+6] * Nds1[k+6][tx];
+				Pvalue2 += Mds[ty][k+6] * Nds2[k+6][tx];
+				Pvalue3 += Mds[ty][k+6] * Nds3[k+6][tx];
+				Pvalue4 += Mds[ty][k+6] * Nds4[k+6][tx];
+				Pvalue1 += Mds[ty][k+7] * Nds1[k+7][tx];
+				Pvalue2 += Mds[ty][k+7] * Nds2[k+7][tx];
+				Pvalue3 += Mds[ty][k+7] * Nds3[k+7][tx];
+				Pvalue4 += Mds[ty][k+7] * Nds4[k+7][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+		Pd[Row*Width + Col3] = Pvalue3; 
+		Pd[Row*Width + Col4] = Pvalue4; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled16x16gran1x2prefetchUnrolling(float* Md, float* Nd, float* Pd, int Width, int unrolling) { 
+	if ((blockIdx.x % 2) == 0) {	
+		const int TILE_WIDTH = 16;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			__syncthreads();
+
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+
+			if(unrolling == 2) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+				}
+			}
+			else if(unrolling == 4) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+					Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+					Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+					Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+					Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+				}
+			}
+			else {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+				Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+				Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+				Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+				Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+				Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+				Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+				Pvalue1 += Mds[ty][k+4] * Nds1[k+4][tx];
+				Pvalue2 += Mds[ty][k+4] * Nds2[k+4][tx];
+				Pvalue1 += Mds[ty][k+5] * Nds1[k+5][tx];
+				Pvalue2 += Mds[ty][k+5] * Nds2[k+5][tx];
+				Pvalue1 += Mds[ty][k+6] * Nds1[k+6][tx];
+				Pvalue2 += Mds[ty][k+6] * Nds2[k+6][tx];
+				Pvalue1 += Mds[ty][k+7] * Nds1[k+7][tx];
+				Pvalue2 += Mds[ty][k+7] * Nds2[k+7][tx];
+			}
+			__syncthreads();
+		} 
+		Pd[Row*Width + Col1] = Pvalue1; 
+		Pd[Row*Width + Col2] = Pvalue2; 
+	}
+}
+
+inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetchUnrolling(float* Md, float* Nd, float* Pd, int Width, int unrolling) { 
+	if ((blockIdx.x % 4) == 0) {
+		const int TILE_WIDTH = 16;
+		__shared__ float Mds[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds1[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds2[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds3[TILE_WIDTH][TILE_WIDTH]; 
+		__shared__ float Nds4[TILE_WIDTH][TILE_WIDTH]; 
+		int bx = blockIdx.x;  
+		int by = blockIdx.y; 
+		int tx = threadIdx.x; 
+		int ty = threadIdx.y; 
+		// Identify the row and column of the Pd element to work on
+		int Row = by * TILE_WIDTH + ty; 
+		int Col1 = bx * TILE_WIDTH + tx; 
+		int Col2 = Col1 + TILE_WIDTH; 
+		int Col3 = Col2 + TILE_WIDTH; 
+		int Col4 = Col3 + TILE_WIDTH; 
+		float Pvalue1 = 0; 
+		float Pvalue2 = 0; 
+		float Pvalue3 = 0; 
+		float Pvalue4 = 0; 
+		// Loop over the Md and Nd tiles required to compute the Pd element 
+
+		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
+		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
+		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
+		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
+		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
+		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
+			// Collaborative loading of Md and Nd tiles into shared memory
+			Mds[ty][tx] = M;
+			Nds1[ty][tx] = N1;
+			Nds2[ty][tx] = N2;
+			Nds3[ty][tx] = N3;
+			Nds4[ty][tx] = N4;
+			__syncthreads();
+
+			M = Md[Row*Width + ((m+1)*TILE_WIDTH + tx)]; 
+			N1 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col1];
+			N2 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col2];
+			N3 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col3];
+			N4 = Nd[((m+1)*TILE_WIDTH + ty)*Width + Col4];
+
+			if(unrolling == 2) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+					Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+					Pvalue3 += Mds[ty][k+1] * Nds3[k+1][tx];
+					Pvalue4 += Mds[ty][k+1] * Nds4[k+1][tx];
+				}
+			}
+			else if(unrolling == 4) {
+				for (int k = 0; k < TILE_WIDTH; k+=unrolling) {
+					Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+					Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+					Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+					Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+					Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+					Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+					Pvalue3 += Mds[ty][k+1] * Nds3[k+1][tx];
+					Pvalue4 += Mds[ty][k+1] * Nds4[k+1][tx];
+					Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+					Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+					Pvalue3 += Mds[ty][k+2] * Nds3[k+2][tx];
+					Pvalue4 += Mds[ty][k+2] * Nds4[k+2][tx];
+					Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+					Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+					Pvalue3 += Mds[ty][k+3] * Nds3[k+3][tx];
+					Pvalue4 += Mds[ty][k+3] * Nds4[k+3][tx];
+				}
+			}
+			else {
+				Pvalue1 += Mds[ty][k] * Nds1[k][tx];
+				Pvalue2 += Mds[ty][k] * Nds2[k][tx];
+				Pvalue3 += Mds[ty][k] * Nds3[k][tx];
+				Pvalue4 += Mds[ty][k] * Nds4[k][tx];
+				Pvalue1 += Mds[ty][k+1] * Nds1[k+1][tx];
+				Pvalue2 += Mds[ty][k+1] * Nds2[k+1][tx];
+				Pvalue3 += Mds[ty][k+1] * Nds3[k+1][tx];
+				Pvalue4 += Mds[ty][k+1] * Nds4[k+1][tx];
+				Pvalue1 += Mds[ty][k+2] * Nds1[k+2][tx];
+				Pvalue2 += Mds[ty][k+2] * Nds2[k+2][tx];
+				Pvalue3 += Mds[ty][k+2] * Nds3[k+2][tx];
+				Pvalue4 += Mds[ty][k+2] * Nds4[k+2][tx];
+				Pvalue1 += Mds[ty][k+3] * Nds1[k+3][tx];
+				Pvalue2 += Mds[ty][k+3] * Nds2[k+3][tx];
+				Pvalue3 += Mds[ty][k+3] * Nds3[k+3][tx];
+				Pvalue4 += Mds[ty][k+3] * Nds4[k+3][tx];
+				Pvalue1 += Mds[ty][k+4] * Nds1[k+4][tx];
+				Pvalue2 += Mds[ty][k+4] * Nds2[k+4][tx];
+				Pvalue3 += Mds[ty][k+4] * Nds3[k+4][tx];
+				Pvalue4 += Mds[ty][k+4] * Nds4[k+4][tx];
+				Pvalue1 += Mds[ty][k+5] * Nds1[k+5][tx];
+				Pvalue2 += Mds[ty][k+5] * Nds2[k+5][tx];
+				Pvalue3 += Mds[ty][k+5] * Nds3[k+5][tx];
+				Pvalue4 += Mds[ty][k+5] * Nds4[k+5][tx];
+				Pvalue1 += Mds[ty][k+6] * Nds1[k+6][tx];
+				Pvalue2 += Mds[ty][k+6] * Nds2[k+6][tx];
+				Pvalue3 += Mds[ty][k+6] * Nds3[k+6][tx];
+				Pvalue4 += Mds[ty][k+6] * Nds4[k+6][tx];
+				Pvalue1 += Mds[ty][k+7] * Nds1[k+7][tx];
+				Pvalue2 += Mds[ty][k+7] * Nds2[k+7][tx];
+				Pvalue3 += Mds[ty][k+7] * Nds3[k+7][tx];
+				Pvalue4 += Mds[ty][k+7] * Nds4[k+7][tx];
 			}
 			__syncthreads();
 		} 
