@@ -47,11 +47,8 @@ inline void MatrixMulOnDevice2(float* M, float* N, float* P, int Width, float ti
 	cudaMalloc(&Md, size);   
 	cudaMemcpy(Md, M, size, cudaMemcpyHostToDevice);   
 	cudaMalloc(&Nd, size);   
-	cudaMemcpy(Nd, N, size, cudaMemcpyHostToDevice);   
-	//Allocate P on the device   
-	cudaMalloc(&Pd, size);
-	// Kernel invocation code – to be shown later    
-	// Setup the execution configuration    
+	cudaMemcpy(Nd, N, size, cudaMemcpyHostToDevice);
+	cudaMalloc(&Pd, size);  
 	dim3 dimGrid2(Width/8, Width/8);   
 	dim3 dimBlock2(8, 8);
 
@@ -78,26 +75,18 @@ inline void MatrixMulOnDevice2(float* M, float* N, float* P, int Width, float ti
 
 inline void MatrixMulOnDevice3(float* M, float* N, float* P, int Width, float timing) {   
 	int size = Width * Width * sizeof(float);    
-	float *Md, *Nd, *Pd;   
-	//Allocate and Load M, N to device memory    
+	float *Md, *Nd, *Pd;     
 	cudaMalloc(&Md, size);   
 	cudaMemcpy(Md, M, size, cudaMemcpyHostToDevice);   
 	cudaMalloc(&Nd, size);   
 	cudaMemcpy(Nd, N, size, cudaMemcpyHostToDevice);   
-	//Allocate P on the device   
 	cudaMalloc(&Pd, size);
-	// Kernel invocation code – to be shown later    
-	// Setup the execution configuration    
 	dim3 dimGrid3(Width/16, Width/16);   
 	dim3 dimBlock3(16, 16);
 	cudaEvent_t start, stop;
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
-	// Start record
 	cudaEventRecord(start, 0);
-	// Do something on GPU
-    // Launch the device computation threads!  
-    // Launch the device computation threads!    
 	MatrixMulKernelTiled16x16<<< dimGrid3, dimBlock3 >>>(Md, Nd, Pd, Width);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
@@ -211,13 +200,10 @@ inline __global__ void MatrixMulKernelTiled8x8(float* Md, float* Nd, float* Pd, 
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 	for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-		// Collaborative loading of Md and Nd tiles into shared memory
 		Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 		Nds[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col];
 		__syncthreads();
@@ -236,13 +222,10 @@ inline __global__ void MatrixMulKernelTiled16x16(float* Md, float* Nd, float* Pd
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 	for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-		// Collaborative loading of Md and Nd tiles into shared memory
 		Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 		Nds[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col];
 		__syncthreads();
@@ -261,13 +244,10 @@ inline __global__ void MatrixMulKernelTiled8x8Unrolling(float* Md, float* Nd, fl
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 	for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-		// Collaborative loading of Md and Nd tiles into shared memory
 		Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 		Nds[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col];
 		__syncthreads();
@@ -309,13 +289,10 @@ inline __global__ void MatrixMulKernelTiled16x16Unrolling(float* Md, float* Nd, 
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 	for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-		// Collaborative loading of Md and Nd tiles into shared memory
 		Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 		Nds[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col];
 		__syncthreads();
@@ -357,11 +334,9 @@ inline __global__ void MatrixMulKernelTiled8x8prefetchUnrolling(float* Md, float
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 
 	int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 	int N = Nd[(0*TILE_WIDTH + ty)*Width + Col];
@@ -410,11 +385,9 @@ inline __global__ void MatrixMulKernelTiled16x16prefetchUnrolling(float* Md, flo
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 
 	int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 	int N = Nd[(0*TILE_WIDTH + ty)*Width + Col];
@@ -463,11 +436,9 @@ inline __global__ void MatrixMulKernelTiled8x8prefetch(float* Md, float* Nd, flo
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 
 	int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 	int N = Nd[(0*TILE_WIDTH + ty)*Width + Col];
@@ -494,11 +465,9 @@ inline __global__ void MatrixMulKernelTiled16x16prefetch(float* Md, float* Nd, f
 	int by = blockIdx.y; 
 	int tx = threadIdx.x; 
 	int ty = threadIdx.y; 
-	// Identify the row and column of the Pd element to work on
 	int Row = by * TILE_WIDTH + ty; 
 	int Col = bx * TILE_WIDTH + tx; 
 	float Pvalue = 0; 
-	// Loop over the Md and Nd tiles required to compute the Pd element 
 
 	int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 	int N = Nd[(0*TILE_WIDTH + ty)*Width + Col];
@@ -527,15 +496,12 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x2(float* Md, float* Nd, floa
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -563,7 +529,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4(float* Md, float* Nd, floa
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -573,9 +538,7 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4(float* Md, float* Nd, floa
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -607,15 +570,12 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x2(float* Md, float* Nd, fl
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -643,7 +603,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4(float* Md, float* Nd, fl
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -653,9 +612,7 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4(float* Md, float* Nd, fl
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -687,15 +644,12 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x2Unrolling(float* Md, float*
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -757,7 +711,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4Unrolling(float* Md, float*
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -767,9 +720,7 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4Unrolling(float* Md, float*
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -867,15 +818,12 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x2Unrolling(float* Md, floa
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -937,7 +885,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4Unrolling(float* Md, floa
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -947,9 +894,7 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4Unrolling(float* Md, floa
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = Md[Row*Width + (m*TILE_WIDTH + tx)]; 
 			Nds1[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col1];
 			Nds2[ty][tx] = Nd[(m*TILE_WIDTH + ty)*Width + Col2];
@@ -1047,19 +992,16 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x2prefetch(float* Md, float* 
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
 		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1092,7 +1034,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetch(float* Md, float* 
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -1102,7 +1043,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetch(float* Md, float* 
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
@@ -1110,7 +1050,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetch(float* Md, float* 
 		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
 		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1149,19 +1088,16 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x2prefetch(float* Md, float
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
 		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1194,7 +1130,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetch(float* Md, float
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -1204,7 +1139,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetch(float* Md, float
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
@@ -1212,7 +1146,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetch(float* Md, float
 		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
 		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1251,19 +1184,16 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x2prefetchUnrolling(float* Md
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
 		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1330,7 +1260,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetchUnrolling(float* Md
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -1340,7 +1269,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetchUnrolling(float* Md
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
@@ -1348,7 +1276,6 @@ inline __global__ void MatrixMulKernelTiled8x8gran1x4prefetchUnrolling(float* Md
 		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
 		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1447,19 +1374,16 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x2prefetchUnrolling(float* 
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
 		float Pvalue1 = 0; 
 		float Pvalue2 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
 		int N2 = Nd[(0*TILE_WIDTH + ty)*Width + Col2];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;
@@ -1526,7 +1450,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetchUnrolling(float* 
 		int by = blockIdx.y; 
 		int tx = threadIdx.x; 
 		int ty = threadIdx.y; 
-		// Identify the row and column of the Pd element to work on
 		int Row = by * TILE_WIDTH + ty; 
 		int Col1 = bx * TILE_WIDTH + tx; 
 		int Col2 = Col1 + TILE_WIDTH; 
@@ -1536,7 +1459,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetchUnrolling(float* 
 		float Pvalue2 = 0; 
 		float Pvalue3 = 0; 
 		float Pvalue4 = 0; 
-		// Loop over the Md and Nd tiles required to compute the Pd element 
 
 		int M = Md[Row*Width + (0*TILE_WIDTH + tx)]; 
 		int N1 = Nd[(0*TILE_WIDTH + ty)*Width + Col1];
@@ -1544,7 +1466,6 @@ inline __global__ void MatrixMulKernelTiled16x16gran1x4prefetchUnrolling(float* 
 		int N3 = Nd[(0*TILE_WIDTH + ty)*Width + Col3];
 		int N4 = Nd[(0*TILE_WIDTH + ty)*Width + Col4];
 		for (int m = 0; m < Width/TILE_WIDTH; ++m) { 
-			// Collaborative loading of Md and Nd tiles into shared memory
 			Mds[ty][tx] = M;
 			Nds1[ty][tx] = N1;
 			Nds2[ty][tx] = N2;

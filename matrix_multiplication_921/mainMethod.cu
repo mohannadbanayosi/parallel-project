@@ -1,68 +1,61 @@
-
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "matrixMultiply.cu"
 #include "matrixGenerator.cu"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <vector>
 
 int main()
 {
 	
 	// START - Randomized matrix creation
-	srand(time(NULL));
-    int multiple = rand() % 20; // a random multiple from 0 to 20
-    printf("multiple = %d\n", multiple );
-    
-    const int width = 16 * multiple;
-    printf("width = %d\n", width );
-    
-    int size = width * width;
-    printf("size = %d\n", size );
-    
-	std::vector<float> M(size);
-    for (int i = 0; i<size; i++) {
-        M[i] = rand() * rand(); // a random value in the matrix from 0 to 1000
-    }
-	std::vector<float> N(size);
-    for (int i = 0; i<size; i++) {
-        N[i] = rand() * rand(); // a random value in the matrix from 0 to 1000
-    }
-	std::vector<float> P(size);
-    // END - Randomized matrix creation
-	
 
+srand(time(NULL));
+int multiple = rand() % 20; // a random multiple from 0 to 20
+printf("multiple = %d\n", multiple );
 
-    
-    const int arraySize = 32;
-    float a[arraySize*arraySize];
-	for(int i = 0; i < 1024; i++) {
-		a[i] = i + 1;
-	}
-    float b[arraySize*arraySize];
-	for(int i = 0; i < 1024; i++) {
-		b[i] = i + 1;
-	}
-	float seq[arraySize*arraySize] = { 0 };
-    float c[arraySize*arraySize] = { 0 };
-	float d[arraySize*arraySize] = { 0 };
-	float e[arraySize*arraySize] = { 0 };
-	float f[arraySize*arraySize] = { 0 };
-	float g[arraySize*arraySize] = { 0 };
-	float h[arraySize*arraySize] = { 0 };
-	float i[arraySize*arraySize] = { 0 };
+const int width = 16 * multiple;
+printf("width = %d\n", width );
+
+int size = width * width;
+printf("size = %d\n", size );
+
+float * a = (float*)malloc(sizeof(float) * width * width);
+float * b = (float*)malloc(sizeof(float) * width * width);
+
+// std::vector<float> M(size);
+for (int i = 0; i<size; i++) {
+    a[i] = rand() * rand(); // a random value in the matrix from 0 to 1000
+}
+// std::vector<float> N(size);
+for (int i = 0; i<size; i++) {
+    b[i] = rand() * rand(); // a random value in the matrix from 0 to 1000
+}
+std::vector<float> P(size);
+// END - Randomized matrix creation
+	    
+	float *seq = (float *)malloc(size * sizeof(float));
+    float *c = (float *)malloc(size * sizeof(float));
+	float *d = (float *)malloc(size * sizeof(float));
+	float *e = (float *)malloc(size * sizeof(float));
+	float *f = (float *)malloc(size * sizeof(float));
+	float *g = (float *)malloc(size * sizeof(float));
+	float *h = (float *)malloc(size * sizeof(float));
+	float *i = (float *)malloc(size * sizeof(float));
 	float timing2 = 0;
 	float timing3 = 0;
+		printf("Sequential\n");
 
-	MatrixMulOnDevice1(a, b, seq, arraySize, NULL);
-	MatrixMulOnDevice2(a, b, c, arraySize, timing2);
-	MatrixMulOnDevice3(a, b, d, arraySize, timing3);
-	MatrixMulOnDevice4(a, b, e, arraySize, 2);
-	MatrixMulOnDevice4(a, b, f, arraySize, 4);
-	MatrixMulOnDevice5(a, b, g, arraySize);
-	MatrixMulOnDevice6(a, b, h, arraySize, 2);
-	MatrixMulOnDevice6(a, b, i, arraySize, 4);
+	MatrixMulOnDevice1(a, b, seq, width, NULL);
+	MatrixMulOnDevice2(a, b, c, width, timing2);
+	MatrixMulOnDevice3(a, b, d, width, timing3);
+	MatrixMulOnDevice4(a, b, e, width, 2);
+	MatrixMulOnDevice4(a, b, f, width, 4);
+	MatrixMulOnDevice5(a, b, g, width);
+	MatrixMulOnDevice6(a, b, h, width, 2);
+	MatrixMulOnDevice6(a, b, i, width, 4);
 
 	printf("Sequential\n");
 	printf("{%f\n,%f\n,%f\n,%f\n,%f\n,%f\n,%f\n,%f\n,%f\n}",
